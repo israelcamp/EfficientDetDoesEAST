@@ -2,7 +2,8 @@ import torch.nn as nn
 import torch
 from torchvision.ops.boxes import nms as nms_torch
 
-from ..efficientnet import EfficientNet as EffNet
+# from ..efficientnet import EfficientNet as EffNet
+from efficientnet_pytorch import EfficientNet as EffNet
 from ..efficientnet.utils import MemoryEfficientSwish, Swish
 from ..efficientnet.utils_extra import Conv2dStaticSamePadding, MaxPool2dStaticSamePadding
 
@@ -439,10 +440,10 @@ class EfficientNet(nn.Module):
     modified by Zylo117
     """
 
-    def __init__(self, compound_coef, load_weights=False):
+    def __init__(self, compound_coef, advprop=False):
         super(EfficientNet, self).__init__()
         model = EffNet.from_pretrained(
-            f'efficientnet-b{compound_coef}', load_weights)
+            f'efficientnet-b{compound_coef}', advprop=advprop)
         del model._conv_head
         del model._bn1
         del model._avg_pooling

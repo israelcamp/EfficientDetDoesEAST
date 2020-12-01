@@ -10,7 +10,7 @@ from .efficientdet.utils import Anchors
 
 
 class EfficientDet(nn.Module):
-    def __init__(self, num_classes=80, compound_coef=0, load_weights=False, **kwargs):
+    def __init__(self, num_classes=80, compound_coef=0, advprop=False, **kwargs):
         super(EfficientDet, self).__init__()
         self.compound_coef = compound_coef
 
@@ -56,7 +56,7 @@ class EfficientDet(nn.Module):
             anchor_scale=self.anchor_scale[compound_coef], **kwargs)
 
         self.backbone_net = EfficientNet(
-            self.backbone_compound_coef[compound_coef], load_weights)
+            self.backbone_compound_coef[compound_coef], advprop)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -96,7 +96,7 @@ class EfficientDet(nn.Module):
 
 class EfficientDetForSemanticSegmentation(nn.Module):
 
-    def __init__(self, load_weights=True, num_classes=2, apply_sigmoid=False, compound_coef=4, repeat=3):
+    def __init__(self, advprop=True, num_classes=2, apply_sigmoid=False, compound_coef=4, repeat=3):
         super().__init__()
         self.compound_coef = compound_coef
         self.backbone_compound_coef = [0, 1, 2, 3, 4, 5, 6, 6]
@@ -124,7 +124,7 @@ class EfficientDetForSemanticSegmentation(nn.Module):
                                                           )
 
         self.backbone_net = EfficientNet(
-            self.backbone_compound_coef[self.compound_coef], load_weights)
+            self.backbone_compound_coef[self.compound_coef], advprop)
 
     def freeze_bn(self):
         for m in self.modules():
@@ -162,11 +162,11 @@ class EfficientDetForSemanticSegmentation(nn.Module):
 
 class EfficientDetDoesEAST(nn.Module):
 
-    def __init__(self, load_weights=True, compound_coef=4):
+    def __init__(self, advprop=True, compound_coef=4):
         super().__init__()
         self.num_classes = 40
         self.backbone = EfficientDetForSemanticSegmentation(
-            load_weights=load_weights, num_classes=self.num_classes, apply_sigmoid=False, compound_coef=compound_coef)
+            advprop=advprop, num_classes=self.num_classes, apply_sigmoid=False, compound_coef=compound_coef)
 
         self.scores = nn.Conv2d(self.num_classes, 5, 1, groups=5)
 
