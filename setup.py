@@ -5,6 +5,11 @@ setup(
     packages=find_packages(),
     version='0.1.0',
     description='EfficientDet',
-    author='Github + Israel',
+    author='Israel',
     license='MIT',
+    install_requires=[
+        'torch>1.5',
+        'efficientnet_pytorch>=0.7.0',
+        'numpy>=1'
+    ]
 )
