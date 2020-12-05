@@ -25,8 +25,8 @@
 
 ## TODO
 
-- [] Add other coeficients for **Segmentation** and **EAST**
-- [] Add EfficientDet-D7x
-- [] Release model checkpoint for the SROIE 2019 submission
-- [] Add results and model checkpoint for the [ICDAR2019 Robust Reading Challenge on Arbitrary-Shaped Text](https://rrc.cvc.uab.es/?ch=14)
-- [] Add documentation
+- [ ] Add other coeficients for **Segmentation** and **EAST**
+- [ ] Add EfficientDet-D7x
+- [ ] Release model checkpoint for the SROIE 2019 submission
+- [ ] Add results and model checkpoint for the [ICDAR2019 Robust Reading Challenge on Arbitrary-Shaped Text](https://rrc.cvc.uab.es/?ch=14)
+- [ ] Add documentation
