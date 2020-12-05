@@ -7,7 +7,7 @@ from torch import nn
 
 from .efficientdet.model import BiFPN, Regressor, Classifier, EfficientNet, SegmentationClasssificationHead
 from .efficientdet.utils import Anchors
-
+from .efficientnet.utils import MemoryEfficientSwish
 
 class EfficientDet(nn.Module):
     def __init__(self, num_classes=80, compound_coef=0, advprop=False, **kwargs):
@@ -96,20 +96,36 @@ class EfficientDet(nn.Module):
 
 class EfficientDetForSemanticSegmentation(nn.Module):
 
-    def __init__(self, advprop=True, num_classes=2, apply_sigmoid=False, compound_coef=4, repeat=3):
+    def __init__(self, advprop=True, num_classes=2, apply_sigmoid=False, compound_coef=4, repeat=3, expand_bifpn=False, factor2=False):
         super().__init__()
         self.compound_coef = compound_coef
         self.backbone_compound_coef = [0, 1, 2, 3, 4, 5, 6, 6]
         self.input_sizes = [512, 640, 768, 896, 1024, 1280, 1280, 1536]
         self.num_classes = num_classes
+        self.expand_bifpn = expand_bifpn
 
-        conv_channel_coef = {
-            # the channels of P2/P3/P4.
-            0: [24, 40, 112],
-            4: [32, 56, 160],
-        }
+
+        if factor2:
+            conv_channel_coef = {
+                # the channels of P2/P3/P4.
+                0: [16, 24, 40],
+                4: [24, 32, 56],
+            }
+        else:
+            conv_channel_coef = {
+                # the channels of P2/P3/P4.
+                0: [24, 40, 112],
+                4: [32, 56, 160],
+            }
+
 
         bifpn_channels = 128
+        if expand_bifpn:
+            self.expand_conv = nn.Sequential(nn.ConvTranspose2d(bifpn_channels, bifpn_channels, 2, 2),
+                                             nn.BatchNorm2d(bifpn_channels),
+                                             MemoryEfficientSwish())
+
+
         self.bifpn = nn.Sequential(
             *[BiFPN(bifpn_channels,
                     conv_channel_coef[compound_coef],
@@ -123,11 +139,18 @@ class EfficientDetForSemanticSegmentation(nn.Module):
                                                           apply_sigmoid=apply_sigmoid
                                                           )
 
-        self.backbone_net = EfficientNet(
-            self.backbone_compound_coef[self.compound_coef], advprop)
+        self.backbone_net = EfficientNet(self.backbone_compound_coef[self.compound_coef],
+                                        advprop=advprop, 
+                                        factor2=factor2)
 
     def freeze_bn(self):
         for m in self.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                m.eval()
+
+    def freeze_backbone_bn(self):
+        ''' Freezes only the BN of the backbone_net '''
+        for m in self.backbone_net.modules():
             if isinstance(m, nn.BatchNorm2d):
                 m.eval()
 
@@ -147,6 +170,9 @@ class EfficientDetForSemanticSegmentation(nn.Module):
         features = self.extract_backbone_features(inputs)
         feat_map = self.extract_bifpn_features(features)[0]
 
+        if self.expand_bifpn:
+            feat_map = self.expand_conv(feat_map)
+
         classification = self.classifier(feat_map)
 
         return classification
@@ -162,11 +188,16 @@ class EfficientDetForSemanticSegmentation(nn.Module):
 
 class EfficientDetDoesEAST(nn.Module):
 
-    def __init__(self, advprop=True, compound_coef=4):
+    def __init__(self, advprop=True, compound_coef=4, expand_bifpn=False, factor2=False):
         super().__init__()
         self.num_classes = 40
         self.backbone = EfficientDetForSemanticSegmentation(
-            advprop=advprop, num_classes=self.num_classes, apply_sigmoid=False, compound_coef=compound_coef)
+                                                            advprop=advprop,
+                                                            num_classes=self.num_classes, 
+                                                            apply_sigmoid=False,
+                                                            compound_coef=compound_coef,
+                                                            expand_bifpn=expand_bifpn,
+                                                            factor2=factor2)
 
         self.scores = nn.Conv2d(self.num_classes, 5, 1, groups=5)
 

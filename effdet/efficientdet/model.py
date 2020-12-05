@@ -440,7 +440,7 @@ class EfficientNet(nn.Module):
     modified by Zylo117
     """
 
-    def __init__(self, compound_coef, advprop=False):
+    def __init__(self, compound_coef, advprop=False, factor2=False):
         super(EfficientNet, self).__init__()
         model = EffNet.from_pretrained(
             f'efficientnet-b{compound_coef}', advprop=advprop)
@@ -450,6 +450,7 @@ class EfficientNet(nn.Module):
         del model._dropout
         del model._fc
         self.model = model
+        self.factor2 = factor2
 
     def forward(self, x):
         x = self.model._conv_stem(x)
@@ -473,7 +474,7 @@ class EfficientNet(nn.Module):
                 feature_maps.append(x)
             last_x = x
         del last_x
-        return feature_maps[1:]
+        return feature_maps[1:] if not self.factor2 else feature_maps[:-1] # make a variable to handle where it starts and ends
 
 
 if __name__ == '__main__':
