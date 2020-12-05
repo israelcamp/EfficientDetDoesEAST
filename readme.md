@@ -2,7 +2,7 @@
 
 ## Where did I copy it from?
 
-1. [Yet-Another-EfficientDet-Pytorch](https://github.com/zylo117/Yet-Another-EfficientDet-Pytorch) by Zylo117 contains most of the base code to create the EfficientDet, however I cleaned it a little to have only what I need
+1. [Yet-Another-EfficientDet-Pytorch](https://github.com/zylo117/Yet-Another-EfficientDet-Pytorch) by Zylo117 contains most of the base code to create the EfficientDet, however I cleaned it a little to have only what I need and used [lukemela's implementation of EfficientNet directly](https://github.com/lukemelas/EfficientNet-PyTorch)
 1. [EfficientDet](https://arxiv.org/abs/1911.09070) original paper
 1. [EAST: An Efficient and Accurate Scene Text Detector](https://arxiv.org/abs/1704.03155) inspiration to this repo
 
