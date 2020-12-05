@@ -15,7 +15,7 @@
 ## Limitations
 
 1. We do not have support for EfficientDet-D7x for object detection
-1. For **Segmentation** and **EAST** only D0 and D4 are available, although we intend to add more examples.
+1. For **Segmentation** and **EAST** only D0 and D4 are available, although we intend to add more possibilities.
 
 ## Results
 
