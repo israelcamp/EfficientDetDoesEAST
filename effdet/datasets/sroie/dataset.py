@@ -1,3 +1,5 @@
+# NOT CHANGED TO FIT NEW VERSION
+
 import os
 from PIL import Image
 import random
