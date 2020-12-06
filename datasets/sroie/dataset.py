@@ -12,7 +12,7 @@ import torch
 import torchvision as tv
 from torch.utils.data import Dataset
 
-from ..east_utils import get_input_image_and_bboxes, scale_bboxes, create_ground_truth, resizer
+from effdetn.east import get_input_image_and_bboxes, scale_bboxes, create_ground_truth, resizer
 
 
 def decaying(start, stop, decay):

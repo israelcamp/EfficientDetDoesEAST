@@ -9,10 +9,11 @@ import pytorch_lightning as pl
 import imgaug.augmentables as ia
 import imgaug.augmenters as iaa
 
-from .modeling_efficientdet import EfficientDetDoesEAST
-from .datasets.sroie import SROIEDataset
-from .east_losses import EASTLoss
-from .east_utils import decode
+from effdet.east import EfficientDetDoesEAST
+from effdet.east import EASTLoss
+from effdet.east import decode
+
+from .dataset import SROIEDataset
 
 
 class LightningBase:
