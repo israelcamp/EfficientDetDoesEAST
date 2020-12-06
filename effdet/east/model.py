@@ -8,14 +8,23 @@ from ..segmentation import EfficientDetForSemanticSegmentation
 
 class EfficientDetDoesEAST(nn.Module):
 
-    def __init__(self, advprop=True, compound_coef=4, expand_bifpn=False, factor2=False):
+    def __init__(self, 
+                advprop: bool = True, 
+                compound_coef: int = 4, 
+                expand_bifpn: bool = False, 
+                n_seg_channels: int = 40,
+                repeat_bifpn: int = 3,
+                bifpn_channels: int = 128,
+                factor2: bool = False):
         super().__init__()
-        self.num_classes = 40
+        self.num_classes = n_seg_channels
         self.backbone = EfficientDetForSemanticSegmentation(advprop=advprop,
                                                             num_classes=self.num_classes, 
                                                             apply_sigmoid=False,
                                                             compound_coef=compound_coef,
                                                             expand_bifpn=expand_bifpn,
+                                                            repeat=repeat_bifpn,
+                                                            bifpn_channels=bifpn_channels,
                                                             factor2=factor2)
 
         self.scores = nn.Conv2d(self.num_classes, 5, 1, groups=5)

@@ -23,7 +23,9 @@ class EfficientDetForSemanticSegmentation(nn.Module):
                 2: [16, 24, 48],
                 3: [24, 32, 48],
                 4: [24, 32, 56],
-                5: [24, 40, 64]
+                5: [24, 40, 64],
+                6: [32, 40, 72],
+                7: [32, 48, 80]
             }
         else:
             conv_channel_coef = {
@@ -33,7 +35,9 @@ class EfficientDetForSemanticSegmentation(nn.Module):
                 2: [24, 48, 112],
                 3: [32, 48, 136],
                 4: [32, 56, 160],
-                5: [40, 64, 176]
+                5: [40, 64, 176],
+                6: [40, 72, 200],
+                7: [48, 80, 224]
             }
 
         if expand_bifpn:

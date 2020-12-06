@@ -15,7 +15,6 @@
 ## Limitations
 
 1. We do not have support for EfficientDet-D7x for object detection
-1. For **Segmentation** and **EAST** only D0 and D4 are available, although we intend to add more possibilities.
 
 ## Results
 
@@ -26,7 +25,7 @@
 ## TODO
 
 - [x] Add other coeficients for **Segmentation** and **EAST**
-- [ ] Add D7 to **Segmentation** and **EAST**
+- [x] Add D7 to **Segmentation** and **EAST**
 - [ ] Add EfficientDet-D7x
 - [ ] Release model checkpoint for the SROIE 2019 submission
 - [ ] Add results and model checkpoint for the [ICDAR2019 Robust Reading Challenge on Arbitrary-Shaped Text](https://rrc.cvc.uab.es/?ch=14)
