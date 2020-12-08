@@ -64,9 +64,16 @@ class IoULoss(nn.Module):
 
 class EASTLoss(nn.Module):
 
-    def __init__(self, lamb=1., do_bce: bool = False, do_dice: bool = True):
+    def __init__(self, 
+                iou_weight: float = 1., 
+                dice_weight: float = 1.,
+                bce_weight: float = 1.,
+                do_bce: bool = False, 
+                do_dice: bool = True):
         super().__init__()
-        self.lamb = lamb
+        self.iou_weight = iou_weight
+        self.dice_weight = dice_weight
+        self.bce_weight = bce_weight
         self.dice = DiceLoss()
         self.bce = BalancedBCE()
         self.iou = IoULoss()
@@ -79,17 +86,17 @@ class EASTLoss(nn.Module):
 
         # IoU
         iou = self.iou(y_pred[:, 1:], y_true[:, 1:], y_true[:, 0])
-        losses['iou'] = self.lamb * iou
+        losses['iou'] = self.iou_weight * iou
 
         # Dice
         if self.do_dice:
             dice = self.dice(y_true[:, 0], y_pred[:, 0])
-            losses['dice'] = dice
+            losses['dice'] = self.dice_weight * dice
 
         # BCE
         if self.do_bce:
             bce = self.bce(y_true[:, 0], y_pred[:, 0])
-            losses['bce'] = bce
+            losses['bce'] = self.bce_weight * bce
 
         loss = sum(losses.values())
 
