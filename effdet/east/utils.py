@@ -101,6 +101,8 @@ def decode(pred_image, scale, threshold=0.8, nms_iou=0.01):
         boxes.append(box)
     probs, boxes = torch.tensor(probas), torch.tensor(boxes)
 
-    keep_indices = tv.ops.nms(boxes, probs, nms_iou)
-    keep_boxes = boxes[keep_indices]
-    return keep_boxes
+    if len(boxes.shape) > 1:
+        keep_indices = tv.ops.nms(boxes, probs, nms_iou)
+        keep_boxes = boxes[keep_indices]
+        return keep_boxes
+    return None
