@@ -16,17 +16,18 @@ from torch.utils.data import Dataset
 import torchvision as tv
 
 # Types
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 import dataclasses
 from pydantic.dataclasses import dataclass
-from pydantic import validate_arguments, validator
+from pydantic import validate_arguments, validator, Field
+from pydantic import DirectoryPath, FilePath
 
 from effdet.east import get_input_image_and_bboxes, scale_bboxes, create_ground_truth
 
 @dataclass
 class COCO_Text:
     
-    annotation_file: Path = dataclasses.field(metadata="location of annotation file")
+    annotation_file: FilePath = Field(..., description="location of annotation file")
     
     def __post_init_post_parse__(self,):
         """
@@ -144,15 +145,18 @@ class COCO_Text:
         return self.imgs[id]
 
 
-@dataclasses.dataclass
+class DatasetConfig:
+    arbitrary_types_allowed = True
+
+@dataclass(config=DatasetConfig)
 class COCOTextDataset(Dataset):
     
-    img_ids: List[int]
-    img_dir: str
-    ct: COCO_Text 
-    image_size:Tuple[int, int] = dataclasses.field(default=(768, 768))
-    scale: int = dataclasses.field(default=4)
-    transforms: Optional[albumentations.Compose] = dataclasses.field(default=None)
+    img_ids: List[int] =         Field(..., description="Image ids from COCO Dataset")
+    img_dir: DirectoryPath =     Field(..., description="Path to dir with images")
+    ct: COCO_Text =              Field(..., description="COCO Text instance")
+    image_size:Tuple[int, int] = Field(default=(768, 768), description="Image size in (h,w)")
+    scale: int =                 Field(default=4, description="Mask relative scale to image (h/scale, w/scale)")
+    transforms: Optional[albumentations.Compose] = dataclasses.field(default=None, metadata="Albumentations transforms")
         
     to_torch = tv.transforms.Compose([
         tv.transforms.ToTensor(),
