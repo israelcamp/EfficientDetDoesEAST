@@ -133,3 +133,4 @@ weights/
 # other
 *.pth
 lightning_logs/
+datasets/sroie/utils

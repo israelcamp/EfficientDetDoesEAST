@@ -12,7 +12,7 @@ import torch
 import torchvision as tv
 from torch.utils.data import Dataset
 
-from effdetn.east import get_input_image_and_bboxes, scale_bboxes, create_ground_truth, resizer
+from effdet.east import get_input_image_and_bboxes, scale_bboxes, create_ground_truth, resizer
 
 
 def decaying(start, stop, decay):
@@ -49,20 +49,15 @@ def get_image_and_bboxes(image_path):
 
 class SROIEDataset(Dataset):
 
-    def __init__(self, image_files, folderpath, height, width, scale,
+    def __init__(self, image_files, height, width, scale,
                  ia_tfms=None,
                  do_gray=True,
                  test=False,
-                 tfms_decay=(0.9, 0.0, 1e-5),
-                 mean=torch.tensor([0.485, 0.456, 0.406]),
-                 std=torch.tensor([0.229, 0.224, 0.225])):
+                 tfms_decay=(0.9, 0.0, 1e-5)):
         self.image_files = image_files
-        self.folderpath = folderpath
         self.height = height
         self.width = width
         self.scale = scale
-        self.mean = mean
-        self.std = std
         self.test = test
         self.do_gray = do_gray
         self.gray_tfms = iaa.Grayscale(alpha=1.0)
@@ -71,13 +66,13 @@ class SROIEDataset(Dataset):
 
         self.torch_tfms = tv.transforms.Compose([
             tv.transforms.ToTensor(),
-            tv.transforms.Normalize(mean=self.mean, std=self.std)])
+            tv.transforms.Lambda(lambda x: 2.*x-1.)])
 
     def __len__(self,):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        image_path = os.path.join(self.folderpath, self.image_files[idx])
+        image_path = self.image_files[idx]
 
         if self.test:
             image = get_image(image_path)

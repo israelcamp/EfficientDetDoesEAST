@@ -8,8 +8,7 @@ import os
 import numpy as np
 from PIL import Image
 import imgaug.augmentables as ia
-import albumentations
-import albumentations as A
+import imgaug.augmenters as iaa
 
 # Torch
 from torch.utils.data import Dataset
@@ -156,7 +155,7 @@ class COCOTextDataset(Dataset):
     ct: COCO_Text =              Field(..., description="COCO Text instance")
     image_size:Tuple[int, int] = Field(default=(768, 768), description="Image size in (h,w)")
     scale: int =                 Field(default=4, description="Mask relative scale to image (h/scale, w/scale)")
-    transforms: Optional[albumentations.Compose] = dataclasses.field(default=None, metadata="Albumentations transforms")
+    transforms: Optional[iaa.Sequential] = dataclasses.field(default=None, metadata="Albumentations transforms")
         
     to_torch = tv.transforms.Compose([
         tv.transforms.ToTensor(),
@@ -191,10 +190,7 @@ class COCOTextDataset(Dataset):
         
         # HERE COMES THE AUGMENTATIONS
         if self.transforms is not None:
-            transformed = self.transforms(image=image, bboxes=bboxes.to_xyxy_array())
-            image = transformed['image']
-            bboxes_aug = transformed['bboxes']
-            bboxes = ia.BoundingBoxesOnImage.from_xyxy_array(bboxes_aug, image.shape)
+            image, bboxes = self.transforms(image=image, bounding_boxes=bboxes)
             bboxes = bboxes.remove_out_of_image_fraction(fraction=0.75)
             bboxes = bboxes.clip_out_of_image()
 
