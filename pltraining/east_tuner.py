@@ -71,7 +71,7 @@ class EfficientDetDoesPL(pl.LightningModule):
         return loss_avg
 
     def get_loss_fct(self,):
-        return EASTLoss(dice_weight=self.hparams.dice_weight)
+        return EASTLoss(dice_weight=self.hparams.dice_weight, iou_weight=self.hparams.iou_weight)
 
     ## FUNCTIONS NEEDED BY PYTORCH LIGHTNING ##
 
@@ -138,6 +138,7 @@ class EASTUner(EfficientDetDoesPL):
         "optimizer": 'Adam',
         "optimizer_kwargs": {},
         "dice_weight": 0.1,
+        "iou_weight": 0.1,
         "deterministic": False,
         "seed": 0,
     }
