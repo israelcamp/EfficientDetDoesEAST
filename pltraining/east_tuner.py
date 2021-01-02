@@ -13,7 +13,7 @@ from effdet.east import EfficientDetDoesEAST, decode, resizer, EASTLoss
 
 def eastmask_to_image(image, emask, scale=4, ths=0.5, nms=0.01):
     xyxy = decode(emask, scale=scale, threshold=ths, nms_iou=nms)
-    image = (image + 1)/2.
+    image = (image + 1)/2. 
     if xyxy is not None:
         # bboxes and resize
         image = image.permute(1, 2, 0)
@@ -71,12 +71,13 @@ class EfficientDetDoesPL(pl.LightningModule):
         return loss_avg
 
     def get_loss_fct(self,):
-        return EASTLoss(dice_weight=self.hparams.dice_weight, iou_weight=self.hparams.iou_weight)
+        return EASTLoss(**self.hparams.loss_hparams)
 
     ## FUNCTIONS NEEDED BY PYTORCH LIGHTNING ##
 
     def training_step(self, batch, batch_idx):
-        self.model.backbone.freeze_bn()
+        if self.hparams.freeze_backbone_bn:
+            self.model.backbone.freeze_bn()
 
         outputs = self._handle_batch(batch)
         loss = outputs[0]
@@ -134,11 +135,11 @@ class EASTUner(EfficientDetDoesPL):
         "advprop": True,
         "factor2": False,
         "expand_bifpn": False,
+        "freeze_backbone_bn": True,
         "lr": 5e-4,
         "optimizer": 'Adam',
         "optimizer_kwargs": {},
-        "dice_weight": 0.1,
-        "iou_weight": 0.1,
+        "loss_hparams": {},
         "deterministic": False,
         "seed": 0,
     }

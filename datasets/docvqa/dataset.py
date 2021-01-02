@@ -1,9 +1,9 @@
-# NOT CHANGED TO FIT NEW VERSION
 
 import os
 from PIL import Image
 import random
 
+import srsly
 import numpy as np
 import imgaug
 import imgaug.augmentables as ia
@@ -31,23 +31,27 @@ def get_image(image_path):
 
 
 def get_bboxes(annotations_path, shape):
-    txt_annotations = open(annotations_path).read().split('\n')
+    annotations = srsly.read_json(annotations_path)
+    annotations = annotations['recognitionResults']
+    assert len(annotations) == 1
+    
+    lines = annotations[0]['lines']
     boxes = []
-    for row in txt_annotations[:-1]:
-        x0, y0, _, _, x2, y2, _, _, _ = row.split(',', 8)
-        boxes.append(ia.BoundingBox(int(x0), int(y0), int(x2), int(y2)))
+    for row in lines:
+        x0, y0, _, _, x2, y2, _, _ = row['boundingBox']
+        boxes.append(ia.BoundingBox(x0, y0, x2, y2))
     boxes_on_image = ia.BoundingBoxesOnImage(boxes, shape=shape)
     return boxes_on_image
 
 
 def get_image_and_bboxes(image_path):
-    annotations_path = image_path.replace('.jpg', '.txt')
+    annotations_path = image_path.replace('documents', 'ocr_results').replace('.png', '.json')
     image = get_image(image_path)
     bboxes = get_bboxes(annotations_path, shape=image.shape)
     return image, bboxes
 
 
-class SROIEDataset(Dataset):
+class DocVQADataset(Dataset):
 
     def __init__(self, image_files, height, width, scale,
                  ia_tfms=None,

@@ -86,8 +86,38 @@ def create_ground_truth(boxes, mask_boxes, size, scale):
     y_loss_mask = 1. * (y_loss_mask == gt_image[0])
     return gt_image, y_loss_mask
 
+def iou(box1, box2):
+    return tv.ops.box_iou(box1.view(1, 4), box2.view(1, 4)).item()
 
-def decode(pred_image, scale, threshold=0.8, nms_iou=0.01):
+def weighted_merge(box1, p1, box2, p2):
+    merged_box = (box1 * p1 + box2 * p2) / (p1 + p2)
+    avg_prob = (p1 + p2)*.5
+    return merged_box, avg_prob
+
+def locality_aware_nms(boxes, probas, iou_threshold=0.2):
+    S, P = [], []
+    p, prob_p = None, None
+
+    for box, prob_box in zip(boxes, probas):
+        if p is not None and iou(p, box) > iou_threshold:
+            p, prob_p = weighted_merge(p, prob_p, box, prob_box)
+        else:
+            if p is not None:
+                S.append(p)
+                P.append(prob_p)
+            p = box
+            prob_p = prob_box
+    if p is not None:
+        S.append(p)
+        P.append(prob_p)
+    S, P = torch.stack(S, dim=0), torch.stack(P, dim=0)
+    if len(S.shape) > 1:
+        keep_indices = tv.ops.nms(S, P, iou_threshold)
+    else:
+        keep_indices = list(range(len(boxes))) # keep all
+    return keep_indices
+
+def decode(pred_image, scale, threshold=0.8, nms_iou=0.01, nms_function=tv.ops.nms):
     probas = []
     boxes = []
     nz_coords = torch.nonzero(pred_image[0] > threshold)
@@ -102,7 +132,7 @@ def decode(pred_image, scale, threshold=0.8, nms_iou=0.01):
     probs, boxes = torch.tensor(probas), torch.tensor(boxes)
 
     if len(boxes.shape) > 1:
-        keep_indices = tv.ops.nms(boxes, probs, nms_iou)
+        keep_indices = nms_function(boxes, probs, nms_iou)
         keep_boxes = boxes[keep_indices]
         return keep_boxes
     return None

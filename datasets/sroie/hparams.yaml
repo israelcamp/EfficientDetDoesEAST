@@ -1,0 +1,37 @@
+datamodule:
+  folderpath: SROIE/task1_proc
+  height: 1024
+  width: 512
+  scale: 4
+  do_gray: false
+  tfms_decay: !!python/tuple [0.9, 0.3, 0.0001]
+  train_bs: 2
+  valid_bs: 8
+  num_workers: 4
+  val_pct: 0.1
+  bbox_shrink_pct: 0.8
+trainer:
+  gpus: 1
+  max_epochs: 100
+  accumulate_grad_batches: 1
+  check_val_every_n_epoch: 5
+model:
+  expand_bifpn: false
+  factor2: false
+  lr: 0.0005
+  coef: 4
+  repeat_bifpn: 3
+  bifpn_channels: 128
+  optimizer: Adam
+  freeze_backbone_bn: false
+  backbone_grad: true
+  loss_hparams:
+    do_dice: true
+    do_bce: false
+    do_l1: true
+    bce_weight: 1.
+    dice_weight: 1.
+    iou_weight: 0.5
+    l1_weight: 0.25
+start_from: 
+  ckpt_path: "DocVQACkps/TD-44DocVQA-effdet-epoch=99-val_loss=1.3233.ckpt"

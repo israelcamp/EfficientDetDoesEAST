@@ -16,27 +16,27 @@ class DiceLoss(nn.Module):
 class BalancedBCE(nn.Module):
 
     def forward(self, y_true, y_pred, loss_mask=None):
-        # bs = y_true.shape[0]
-        # size = y_true.shape[-1] * y_true.shape[-2]
+        bs = y_true.shape[0]
+        size = y_true.shape[-1] * y_true.shape[-2]
 
-        # y_true = y_true.view(bs, -1)
-        # y_pred = y_pred.view(bs, -1)
+        y_true = y_true.view(bs, -1)
+        y_pred = y_pred.view(bs, -1)
 
-        # beta = 1. - y_true.sum(-1, keepdim=True) // size
-        # first_term = beta * y_true * torch.log(y_pred)
-        # second_term = (1. - beta) * (1. - y_true) * torch.log(1. - y_pred)
-        # loss = - first_term - second_term
+        beta = 1. - y_true.sum(-1, keepdim=True) // size
+        first_term = beta * y_true * torch.log(y_pred)
+        second_term = (1. - beta) * (1. - y_true) * torch.log(1. - y_pred)
+        loss = - first_term - second_term
 
-        # if loss_mask is not None:
-        #     loss_mask = loss_mask.view(bs, -1)
-        #     loss = loss * loss_mask
-        # return loss.mean()
+        if loss_mask is not None:
+            loss_mask = loss_mask.view(bs, -1)
+            loss = loss * loss_mask
+        return loss.mean()
 
-        n = y_true.sum()
-        N = y_true.numel()
-        beta = 1.0 - 1.0 * n / N
-        loss = -beta * y_true * torch.log(y_pred) - (1 - beta) * (1 - y_true) * torch.log(1 - y_pred)
-        return loss.sum()
+        # n = y_true.sum()
+        # N = y_true.numel()
+        # beta = 1.0 - 1.0 * n / N
+        # loss = -beta * y_true * torch.log(y_pred) - (1 - beta) * (1 - y_true) * torch.log(1 - y_pred)
+        # return loss.sum()
 
 
 
@@ -62,21 +62,49 @@ class IoULoss(nn.Module):
         return self.bbox_loss(y_pred, y_true, y_true_score)
 
 
+class L1(nn.Module):
+
+    def __init__(self,):
+        super().__init__()
+        self.loss_fct = nn.SmoothL1Loss()
+
+    def smooth_l1(self, y_pred, y_true, y_true_score):
+        # repeat the channels
+        y_true_score = torch.stack(4*[y_true_score], dim=1)
+        y_pred = y_pred.reshape(-1)
+        y_true = y_true.reshape(-1)
+        y_true_score = y_true_score.reshape(-1)
+
+        # filter the ones that should learn
+        y_pred_active = y_pred[y_true_score == 1]
+        y_true_active = y_true[y_true_score == 1]
+        loss = self.loss_fct(y_pred_active.unsqueeze(1),
+                             y_true_active.unsqueeze(1))
+        return loss
+
+    def forward(self, y_pred, y_true, y_true_score):
+        return self.smooth_l1(y_pred, y_true, y_true_score)
+
 class EASTLoss(nn.Module):
 
     def __init__(self, 
                 iou_weight: float = 1., 
                 dice_weight: float = 1.,
                 bce_weight: float = 1.,
+                l1_weight: float = 1.,
+                do_l1: bool = True,
                 do_bce: bool = False, 
                 do_dice: bool = True):
         super().__init__()
         self.iou_weight = iou_weight
         self.dice_weight = dice_weight
         self.bce_weight = bce_weight
+        self.do_l1 = do_l1
+        self.l1_weight = l1_weight
         self.dice = DiceLoss()
         self.bce = BalancedBCE()
         self.iou = IoULoss()
+        self.l1 = L1()
 
         self.do_bce = do_bce
         self.do_dice = do_dice
@@ -87,6 +115,11 @@ class EASTLoss(nn.Module):
         # IoU
         iou = self.iou(y_pred[:, 1:], y_true[:, 1:], y_true[:, 0])
         losses['iou'] = self.iou_weight * iou
+
+        # Dice
+        if self.do_l1:
+            l1 = self.l1(y_pred[:, 1:], y_true[:, 1:], y_true[:, 0].long())
+            losses['l1'] = self.l1_weight * l1
 
         # Dice
         if self.do_dice:
