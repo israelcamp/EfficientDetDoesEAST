@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 setup(
     name='effdet',
-    packages=find_packages(),
+    packages=find_packages(exclude=["notebooks"]),
     version='0.1.0',
     description='EfficientDet',
     author='Israel',
