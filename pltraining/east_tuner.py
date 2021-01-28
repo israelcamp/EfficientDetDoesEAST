@@ -13,7 +13,7 @@ from effdet.east import EfficientDetDoesEAST, decode, resizer, EASTLoss
 
 def eastmask_to_image(image, emask, scale=4, ths=0.5, nms=0.01):
     xyxy = decode(emask, scale=scale, threshold=ths, nms_iou=nms)
-    image = (image + 1)/2. 
+    image = (image + 1)/2.
     if xyxy is not None:
         # bboxes and resize
         image = image.permute(1, 2, 0)
@@ -94,8 +94,9 @@ class EfficientDetDoesPL(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx):
         loss, scores, _ = self._handle_eval_batch(batch)
-        if batch_idx == 1:
-            grid = grid_from_batch(batch[0].cpu(), scores.cpu())
+        if batch_idx == self.hparams.val_batch_idx:
+            grid = grid_from_batch(
+                batch[0].cpu(), scores.cpu(), scale=self.hparams.scale)
             try:
                 self.logger.experiment.log_image(
                     'val_image', tv.transforms.ToPILImage()(grid))
@@ -142,6 +143,7 @@ class EASTUner(EfficientDetDoesPL):
         "loss_hparams": {},
         "deterministic": False,
         "seed": 0,
+        "val_batch_idx": 1
     }
 
     def __init__(self, hparams=None, **kwargs):
@@ -163,6 +165,13 @@ class EASTUner(EfficientDetDoesPL):
 
     def _construct_hparams(self, hparams):
         default_hparams = self.default_hparams.copy()
+
+        scale = 4  # default
+        if default_hparams['expand_bifpn']:
+            scale = scale // 2
+        if default_hparams['factor2']:
+            scale = scale // 2
+        default_hparams['scale'] = scale
 
         if hparams is not None:
             default_hparams.update(hparams)
