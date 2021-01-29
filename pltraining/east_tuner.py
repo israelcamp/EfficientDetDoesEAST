@@ -8,7 +8,7 @@ import torch
 import pytorch_lightning as pl
 
 # Mine
-from effdet.east import EfficientDetDoesEAST, decode, resizer, EASTLoss
+from effdet.east import EfficientDetDoesEAST, decode, resizer, EASTLoss, MultiLabelEAST
 
 
 def eastmask_to_image(image, emask, scale=4, ths=0.5, nms=0.01):
@@ -182,3 +182,42 @@ class EASTUner(EfficientDetDoesPL):
             pl.seed_everything(default_hparams['seed'])
 
         return argparse.Namespace(**default_hparams)
+
+
+class MultiLabelEASTUner(EASTUner):
+
+    default_hparams = {
+        "coef": 4,
+        "repeat_bifpn": 3,
+        "bifpn_channels": 128,
+        "advprop": True,
+        "factor2": False,
+        "expand_bifpn": False,
+        "freeze_backbone_bn": True,
+        "lr": 5e-4,
+        "optimizer": 'Adam',
+        "optimizer_kwargs": {},
+        "loss_hparams": {},
+        "deterministic": False,
+        "seed": 0,
+        "val_batch_idx": 1,
+        "num_labels": 2
+    }
+
+    def __init__(self, hparams=None, **kwargs):
+
+        self.model_kwargs = kwargs
+        self.hparams = self._construct_hparams(hparams)
+
+        super(EASTUner, self).__init__()
+
+        self.model = MultiLabelEAST(advprop=self.hparams.advprop,
+                                    compound_coef=self.hparams.coef,
+                                    expand_bifpn=self.hparams.expand_bifpn,
+                                    factor2=self.hparams.factor2,
+                                    repeat_bifpn=self.hparams.repeat_bifpn,
+                                    bifpn_channels=self.hparams.bifpn_channels,
+                                    num_labels=self.hparams.num_labels
+                                    )
+
+        self.loss_fct = self.get_loss_fct()
