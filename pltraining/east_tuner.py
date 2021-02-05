@@ -9,6 +9,7 @@ import pytorch_lightning as pl
 
 # Mine
 from effdet.east import EfficientDetDoesEAST, decode, resizer, EASTLoss, MultiLabelEAST
+from effdet.east.losses import MultiLabelEASTLoss
 
 
 def eastmask_to_image(image, emask, scale=4, ths=0.5, nms=0.01):
@@ -70,9 +71,6 @@ class EfficientDetDoesPL(pl.LightningModule):
         loss_avg = self._average_key(outputs, f'{phase}_loss')
         return loss_avg
 
-    def get_loss_fct(self,):
-        return EASTLoss(**self.hparams.loss_hparams)
-
     ## FUNCTIONS NEEDED BY PYTORCH LIGHTNING ##
 
     def training_step(self, batch, batch_idx):
@@ -95,9 +93,9 @@ class EfficientDetDoesPL(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         loss, scores, _ = self._handle_eval_batch(batch)
         if batch_idx == self.hparams.val_batch_idx:
-            grid = grid_from_batch(
-                batch[0].cpu(), scores.cpu(), scale=self.hparams.scale)
             try:
+                grid = grid_from_batch(
+                    batch[0].cpu(), scores.cpu(), scale=self.hparams.scale)
                 self.logger.experiment.log_image(
                     'val_image', tv.transforms.ToPILImage()(grid))
             except:
@@ -163,6 +161,9 @@ class EASTUner(EfficientDetDoesPL):
 
         self.loss_fct = self.get_loss_fct()
 
+    def get_loss_fct(self,):
+        return EASTLoss(**self.hparams.loss_hparams)
+
     def _construct_hparams(self, hparams):
         default_hparams = self.default_hparams.copy()
 
@@ -183,6 +184,56 @@ class EASTUner(EfficientDetDoesPL):
 
         return argparse.Namespace(**default_hparams)
 
+
+def decode_multi(pred_image, scale, threshold=0.8, nms_iou=0.01, nms_function=tv.ops.nms):
+    probas = []
+    boxes = []
+    
+    segmaps = pred_image[:-4]
+    pred_labels = segmaps.argmax(dim=0)
+    probs = segmaps.softmax(dim=0)
+    probs, _ = probs.max(dim=0)
+    
+    nz_coords = torch.nonzero(pred_labels)
+    
+    for t in zip(nz_coords):
+        y, x = t[0]
+        proba = probs[y, x]
+        probas.append(proba)
+        d1, d2, d3, d4 = pred_image[-4:, y, x]
+        box = [scale * x - d3, scale * y - d1,
+               scale * x + d4, scale * y + d2]
+        boxes.append(box)
+    probs, boxes = torch.tensor(probas), torch.tensor(boxes)
+
+    if len(boxes.shape) > 1:
+        keep_indices = nms_function(boxes, probs, nms_iou)
+        keep_boxes = boxes[keep_indices]
+        return keep_boxes
+    return None
+
+def eastmask_to_image_multi(image, emask, scale=4, ths=0.5, nms=0.01):
+    xyxy = decode_multi(emask, scale=scale, threshold=ths, nms_iou=nms)
+    image = (image + 1)/2.
+    if xyxy is not None:
+        # bboxes and resize
+        image = image.permute(1, 2, 0)
+        bboxes = ia.BoundingBoxesOnImage.from_xyxy_array(
+            xyxy.cpu().numpy(), shape=image.shape)
+        bboxes = resizer(bboxes=bboxes, size=image.shape[:-1])
+        image = tv.transforms.ToTensor()(
+            bboxes.draw_on_image(image, color=(0, 255, 0), size=10))
+    return image
+
+
+def grid_from_batch_multi(images, emasks, scale=4, ths=0.5, nms=0.01):
+    imgs = []
+    for img, em in zip(images, emasks):
+        imgd = eastmask_to_image_multi(img, em, scale=scale, ths=ths, nms=nms)
+        imgs.append(imgd)
+    grid = torch.stack(imgs)
+    grid = tv.utils.make_grid(grid)
+    return grid
 
 class MultiLabelEASTUner(EASTUner):
 
@@ -217,7 +268,29 @@ class MultiLabelEASTUner(EASTUner):
                                     factor2=self.hparams.factor2,
                                     repeat_bifpn=self.hparams.repeat_bifpn,
                                     bifpn_channels=self.hparams.bifpn_channels,
-                                    num_labels=self.hparams.num_labels
+                                    num_labels=self.hparams.num_labels,
+                                    geo_layers=self.hparams.geo_layers,
+                                    class_layers=self.hparams.class_layers
                                     )
 
         self.loss_fct = self.get_loss_fct()
+
+
+    def get_loss_fct(self,):
+        return MultiLabelEASTLoss(**self.hparams.loss_hparams)
+
+    def validation_step(self, batch, batch_idx):
+        loss, scores, _ = self._handle_eval_batch(batch)
+        if batch_idx == self.hparams.val_batch_idx:
+            try:
+                grid = grid_from_batch_multi(
+                    batch[0].cpu(), scores.cpu(), scale=self.hparams.scale, nms=1e-6)
+                self.logger.experiment.log_image(
+                    'val_image', tv.transforms.ToPILImage()(grid))
+            except:
+                pass
+        return {'val_loss': loss}
+
+    def configure_optimizers(self) -> torch.optim.Optimizer:
+        optimizer = self.get_optimizer()
+        return optimizer

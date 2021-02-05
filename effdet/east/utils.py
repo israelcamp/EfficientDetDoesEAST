@@ -86,36 +86,6 @@ def create_ground_truth(boxes, mask_boxes, size, scale):
     y_loss_mask = 1. * (y_loss_mask == gt_image[0])
     return gt_image, y_loss_mask
 
-def iou(box1, box2):
-    return tv.ops.box_iou(box1.view(1, 4), box2.view(1, 4)).item()
-
-def weighted_merge(box1, p1, box2, p2):
-    merged_box = (box1 * p1 + box2 * p2) / (p1 + p2)
-    avg_prob = (p1 + p2)*.5
-    return merged_box, avg_prob
-
-def locality_aware_nms(boxes, probas, iou_threshold=0.2):
-    S, P = [], []
-    p, prob_p = None, None
-
-    for box, prob_box in zip(boxes, probas):
-        if p is not None and iou(p, box) > iou_threshold:
-            p, prob_p = weighted_merge(p, prob_p, box, prob_box)
-        else:
-            if p is not None:
-                S.append(p)
-                P.append(prob_p)
-            p = box
-            prob_p = prob_box
-    if p is not None:
-        S.append(p)
-        P.append(prob_p)
-    S, P = torch.stack(S, dim=0), torch.stack(P, dim=0)
-    if len(S.shape) > 1:
-        keep_indices = tv.ops.nms(S, P, iou_threshold)
-    else:
-        keep_indices = list(range(len(boxes))) # keep all
-    return keep_indices
 
 def decode(pred_image, scale, threshold=0.8, nms_iou=0.01, nms_function=tv.ops.nms):
     probas = []
@@ -135,4 +105,101 @@ def decode(pred_image, scale, threshold=0.8, nms_iou=0.01, nms_function=tv.ops.n
         keep_indices = nms_function(boxes, probs, nms_iou)
         keep_boxes = boxes[keep_indices]
         return keep_boxes
+    return None
+
+
+def intersection(g, p):
+    return tv.ops.box_iou(g.view(1,4), p.view(1,4)).view(-1).item()
+
+def weighted_merge(g, p, ths=0.5):
+    n = 4
+    if p[n] >  ths:
+        g[:n] = (g[n] * g[:n] + p[n] * p[:n]) / (g[n] + p[n])
+        g[n] = max(g[n], p[n])
+    return g
+
+def nms_locality(polys, thres=0.2):
+    ''' Locality aware nms for EAST
+    :param polys: a [N, 4] numpy array. First 8 coordinates, then score.
+    :return: polys after nms
+    '''
+    S = []
+    p = None
+    for g in polys:
+        if p is not None and intersection(g[:4], p[:4]) > thres:
+            p = weighted_merge(g, p)
+        else:
+            if p is not None:
+                S.append(p)
+            p = g
+    if p is not None:
+        S.append(p)
+    return S
+
+def decode_multi(pred_image, scale, nms_iou=0.01, standard_nms=True):
+    probas = []
+    boxes = []
+    labels = []
+    
+    segmaps = pred_image[:-4]
+    
+    pred_labels = segmaps.argmax(dim=0)
+    probs = segmaps.softmax(dim=0)
+    probs, _ = probs.max(dim=0)
+    
+    nz_coords = torch.nonzero(pred_labels)
+    
+    for t in zip(nz_coords):
+        y, x = t[0]
+        proba = probs[y, x]
+        l = pred_labels[y, x]
+        
+        probas.append(proba)
+        labels.append(l)
+        
+        d1, d2, d3, d4 = pred_image[-4:, y, x]
+        box = [scale * x - d3, scale * y - d1,
+               scale * x + d4, scale * y + d2]
+        boxes.append(box)
+    probs, boxes, labels = torch.tensor(probas), torch.tensor(boxes), torch.tensor(labels)
+
+    if len(boxes.shape) > 1:
+        if standard_nms:
+            keep_indices = tv.ops.nms(boxes, probs, nms_iou)
+            
+            keep_boxes = boxes[keep_indices]
+            keep_labels = labels[keep_indices]
+                    
+            return keep_boxes, keep_labels
+    
+        boxes2label = {}
+        
+        for l, b, p in zip(labels, boxes, probs):
+            l = l.item()
+            
+            if l not in boxes2label:
+                boxes2label[l] = []
+            
+            boxes2label[l].append(torch.cat([b.view(1,4),p.view(1,1)], dim=1))
+                        
+        boxes2label = {
+            l:nms_locality(torch.cat(list(v), dim=0), thres=0.5) for l, v in boxes2label.items()
+        }
+        
+        matrices = []
+        for l, v in boxes2label.items():
+            m = torch.stack(v)
+            m = torch.cat([m, l * torch.ones(len(m), 1)], dim=1)
+            matrices.append(m)
+            
+        matrix = torch.cat(matrices, dim=0)
+            
+        boxes, probs, labels = matrix[:,:4], matrix[:, 4], matrix[:, 5].long()
+        
+        keep_indices = tv.ops.nms(boxes, probs, nms_iou)
+        
+        keep_boxes = boxes[keep_indices]
+        keep_labels = labels[keep_indices]
+                
+        return keep_boxes, keep_labels
     return None

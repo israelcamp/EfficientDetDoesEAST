@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+from kornia.losses import FocalLoss, DiceLoss as KorniaDiceLoss
+
 class DiceLoss(nn.Module):
     
     def forward(self, y_true, scores, eps=1e-8):
@@ -130,6 +132,76 @@ class EASTLoss(nn.Module):
         if self.do_bce:
             bce = self.bce(y_true[:, 0], y_pred[:, 0])
             losses['bce'] = self.bce_weight * bce
+
+        loss = sum(losses.values())
+
+        outputs = (loss, losses)
+        return outputs
+
+class MultiLabelEASTLoss(nn.Module):
+
+    def __init__(self, 
+                iou_weight: float = 1., 
+                l1_weight: float = 1.,
+                dice_weight: float = 1.,
+                focal_weight: float= 1.,
+                ce_weight: float = 1.,
+                do_iou: bool = True,
+                do_focal: bool = True,
+                do_l1: bool = True,
+                do_dice: bool = False,
+                do_ce: bool = False,
+                focal_alpha: float = 0.25,
+                focal_reduction: str = 'mean'):
+        super().__init__()
+
+        self.do_iou = do_iou
+        self.iou_weight = iou_weight
+        self.iou = IoULoss()
+        
+        self.do_l1 = do_l1
+        self.l1_weight = l1_weight
+        self.l1 = L1()
+
+        self.do_dice = do_dice
+        self.dice_weight = dice_weight
+        self.dice = KorniaDiceLoss()
+
+        self.do_focal = do_focal
+        self.focal_weight = focal_weight
+        self.focal = FocalLoss(alpha=focal_alpha, reduction=focal_reduction)
+
+        self.do_ce = do_ce
+        self.ce_weight = ce_weight
+        self.ce = nn.CrossEntropyLoss()
+
+    def forward(self, y_true, y_pred, loss_mask=None):
+        losses = {}
+
+        # Dice
+        if self.do_dice:
+            dice = self.dice(y_pred[:, :-4], y_true[:, 0].long())
+            losses['dice'] = self.dice_weight * dice
+            
+        # Focal
+        if self.do_focal:
+            focal = self.focal(y_pred[:, :-4], y_true[:, 0].long())
+            losses['focal'] = self.focal_weight * focal
+
+        if self.do_ce:
+            ce = self.ce(y_pred[:, :-4], y_true[:, 0].long())
+            losses['ce'] = self.ce_weight * ce
+            
+        binary_y_true = 1 * (y_true[:, 0] > 0)
+        # IoU
+        if self.do_iou:
+            iou = self.iou(y_pred[:, -4:], y_true[:, 1:], binary_y_true)
+            losses['iou'] = self.iou_weight * iou
+
+        # Dice
+        if self.do_l1:
+            l1 = self.l1(y_pred[:, -4:], y_true[:, 1:], binary_y_true.long())
+            losses['l1'] = self.l1_weight * l1
 
         loss = sum(losses.values())
 

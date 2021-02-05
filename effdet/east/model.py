@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from ..segmentation import EfficientDetForSemanticSegmentation
-
+from ..base.model import SegmentationClasssificationHead
 
 class EfficientDetDoesEAST(nn.Module):
 
@@ -52,6 +52,8 @@ class MultiLabelEAST(nn.Module):
                  n_seg_channels: int = 40,
                  repeat_bifpn: int = 3,
                  bifpn_channels: int = 128,
+                 geo_layers: int = 1,
+                 class_layers: int = 1,
                  factor2: bool = False):
         super().__init__()
         self.num_classes = n_seg_channels
@@ -64,9 +66,11 @@ class MultiLabelEAST(nn.Module):
                                                             bifpn_channels=bifpn_channels,
                                                             factor2=factor2)
         self.num_labels = num_labels
-        self.geo_scores = nn.Conv2d(self.num_classes, 4, 1, groups=4)
-        self.class_scores = nn.Conv2d(
-            self.num_classes, self.num_labels, kernel_size=1)
+        self.geo_scores = SegmentationClasssificationHead(self.num_classes, 4, num_layers=geo_layers, apply_sigmoid=True)
+        #nn.Conv2d(self.num_classes, 4, 1, groups=4)
+        self.class_scores = SegmentationClasssificationHead(self.num_classes, self.num_labels, num_layers=class_layers)
+        # nn.Conv2d(
+        #     self.num_classes, self.num_labels, kernel_size=1)
 
     def forward(self, x):
         _, _, height, width = x.shape
